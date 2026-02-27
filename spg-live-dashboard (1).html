@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SPG Dashboard — Live</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{--bg:#09090b;--surface:#131316;--surface-2:#1a1a1f;--surface-3:#222228;--border:#27272a;--border-light:#333338;--text:#f4f4f5;--text-secondary:#a1a1aa;--text-muted:#71717a;--gold:#eab308;--gold-dim:rgba(234,179,8,.15);--green:#22c55e;--green-dim:rgba(34,197,94,.12);--red:#ef4444;--red-dim:rgba(239,68,68,.12);--blue:#3b82f6;--blue-dim:rgba(59,130,246,.12);--purple:#a78bfa;--orange:#f97316;--radius:12px;--radius-sm:8px}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'DM Sans',-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.5;min-height:100vh}
+.app{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--surface);border-right:1px solid var(--border);padding:24px 16px;position:fixed;top:0;left:0;bottom:0;overflow-y:auto;z-index:50;transition:transform .3s ease}
+.sidebar-logo{font-family:'Instrument Serif',serif;font-size:20px;padding:0 8px 20px;border-bottom:1px solid var(--border);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.sidebar-logo .dot{width:8px;height:8px;border-radius:50%;background:var(--green);animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.sidebar-section{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted);padding:16px 8px 8px}
+.sidebar-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:var(--text-secondary);cursor:pointer;transition:all .15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:inherit}
+.sidebar-item:hover{background:var(--surface-2);color:var(--text)}
+.sidebar-item.active{background:var(--gold-dim);color:var(--gold)}
+.sidebar-item .icon{font-size:16px;width:20px;text-align:center}
+.main{flex:1;margin-left:240px;min-height:100vh}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:16px 32px;border-bottom:1px solid var(--border);background:var(--surface);position:sticky;top:0;z-index:40}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-title{font-size:15px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.date-badge,.live-badge{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:100px;font-size:12px}
+.date-badge{background:var(--surface-2);border:1px solid var(--border);color:var(--text-secondary)}
+.live-badge{background:var(--green-dim);border:1px solid rgba(34,197,94,.25);font-size:11px;font-weight:600;color:var(--green);text-transform:uppercase;letter-spacing:.05em}
+.live-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:blink 1.5s infinite}
+.sync-info{font-size:10px;color:var(--text-muted);padding:6px 14px;border-radius:100px;background:var(--surface-2);border:1px solid var(--border)}
+.page{padding:28px 32px 60px;display:none}
+.page.active{display:block;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.grid{display:grid;gap:16px;margin-bottom:24px}
+.grid-4{grid-template-columns:repeat(4,1fr)}.grid-3{grid-template-columns:repeat(3,1fr)}.grid-2{grid-template-columns:repeat(2,1fr)}.grid-2-1{grid-template-columns:2fr 1fr}.grid-1-2{grid-template-columns:1fr 2fr}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+.card-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.card-title{font-size:13px;font-weight:500;color:var(--text-secondary)}
+.card-icon{width:32px;height:32px;border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:center;font-size:16px}
+.stat-value{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+.stat-change{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:600;padding:2px 8px;border-radius:100px}
+.stat-change.up{color:var(--green);background:var(--green-dim)}.stat-change.down{color:var(--red);background:var(--red-dim)}
+.stat-sub{font-size:12px;color:var(--text-muted);margin-top:4px}
+.chart-container{position:relative;width:100%;height:280px}
+.chart-container-sm{position:relative;width:100%;height:200px}
+.data-table{width:100%;border-collapse:collapse}
+.data-table th{text-align:left;font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;color:var(--text-muted);padding:10px 12px;border-bottom:1px solid var(--border)}
+.data-table td{padding:12px;font-size:13px;border-bottom:1px solid var(--border);color:var(--text-secondary)}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:hover td{background:var(--surface-2)}
+.brand-cell{display:flex;align-items:center;gap:10px;font-weight:600;color:var(--text)}
+.brand-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.val-positive{color:var(--green)}.val-negative{color:var(--red)}
+.pnl-row{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--border);font-size:14px}
+.pnl-row:last-child{border-bottom:none}
+.pnl-label{color:var(--text-secondary)}.pnl-value{font-weight:600;font-variant-numeric:tabular-nums}
+.pnl-row.total{border-top:2px solid var(--border-light);border-bottom:none;padding-top:16px;margin-top:4px}
+.pnl-row.total .pnl-label{font-weight:700;color:var(--text)}.pnl-row.total .pnl-value{font-size:18px}
+.section-title{font-family:'Instrument Serif',serif;font-size:24px;font-weight:400;margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.section-desc{font-size:13px;color:var(--text-muted);margin-bottom:24px;max-width:600px}
+.data-source{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted);background:var(--surface-2);padding:4px 10px;border-radius:100px;margin-bottom:16px}
+.data-source .gs-icon{width:14px;height:14px;background:var(--green);border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;color:white}
+.alert-banner{display:flex;align-items:center;gap:12px;padding:14px 20px;border-radius:var(--radius);margin-bottom:20px;font-size:13px}
+.alert-warning{background:rgba(234,179,8,.08);border:1px solid rgba(234,179,8,.2);color:var(--gold)}
+.alert-info{background:var(--blue-dim);border:1px solid rgba(59,130,246,.2);color:var(--blue)}
+.heatmap{display:grid;grid-template-columns:60px repeat(7,1fr);gap:3px;font-size:11px}
+.heatmap-label{display:flex;align-items:center;color:var(--text-muted);font-size:11px;padding-right:8px}
+.heatmap-header{text-align:center;color:var(--text-muted);font-size:11px;font-weight:600;padding-bottom:6px}
+.heatmap-cell{aspect-ratio:1;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:rgba(255,255,255,.7);min-height:36px;transition:transform .15s}
+.heatmap-cell:hover{transform:scale(1.1);z-index:2}
+.loading{display:flex;align-items:center;justify-content:center;padding:60px;color:var(--text-muted);font-size:14px;flex-direction:column;gap:12px}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hamburger{display:none;background:none;border:none;color:var(--text);font-size:24px;cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);line-height:1}
+.hamburger:hover{background:var(--surface-2)}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:45;backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.sidebar-overlay.show{display:block}
+@media(max-width:1100px){.grid-4{grid-template-columns:repeat(2,1fr)}.grid-3,.grid-2,.grid-2-1,.grid-1-2{grid-template-columns:1fr}.hamburger{display:block}.sidebar{transform:translateX(-100%)}.sidebar.open{transform:translateX(0)}.main{margin-left:0}}
+@media(max-width:640px){.grid-4{grid-template-columns:1fr 1fr}.page{padding:20px 16px 60px}.topbar{padding:12px 16px}.topbar-title{font-size:13px}.date-badge{font-size:10px;padding:4px 10px}.live-badge{font-size:9px;padding:4px 10px}.sync-info{display:none}.section-title{font-size:20px}.stat-value{font-size:22px}.card{padding:16px}.data-table th,.data-table td{padding:8px 6px;font-size:11px}.chart-container{height:220px}.chart-container-sm{height:180px}.heatmap{font-size:9px;gap:2px}.heatmap-cell{min-height:28px;font-size:8px}.sidebar{width:280px}}
+@media(max-width:400px){.grid-4{grid-template-columns:1fr}.stat-value{font-size:20px}}
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+</style>
+</head>
+<body>
+<div class="app">
+<nav class="sidebar">
+  <div class="sidebar-logo"><span class="dot"></span>SPG Dashboard</div>
+  <div class="sidebar-section">Overview</div>
+  <button class="sidebar-item active" onclick="showPage('overview',this)"><span class="icon">📊</span> Dashboard</button>
+  <button class="sidebar-item" onclick="showPage('pnl',this)"><span class="icon">💰</span> P&L Statement</button>
+  <div class="sidebar-section">Brands</div>
+  <button class="sidebar-item" onclick="showPage('brands',this)"><span class="icon">🏪</span> All Brands</button>
+  <button class="sidebar-item" onclick="showPage('melting',this)"><span class="icon">🧀</span> The Melting Cheese</button>
+  <div class="sidebar-section">Traffic</div>
+  <button class="sidebar-item" onclick="showPage('traffic',this)"><span class="icon">🚶</span> Foot Traffic</button>
+  <button class="sidebar-item" onclick="showPage('heatmap',this)"><span class="icon">🔥</span> Traffic Heatmap</button>
+  <div class="sidebar-section">Marketing</div>
+  <button class="sidebar-item" onclick="showPage('marketing',this)"><span class="icon">📱</span> Social & Campaigns</button>
+  <div style="flex:1"></div>
+  <div style="padding:16px 8px;border-top:1px solid var(--border);margin-top:20px">
+    <div style="font-size:11px;color:var(--text-muted)">Data Source</div>
+    <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;display:flex;align-items:center;gap:6px"><span style="color:var(--green)">●</span> Google Sheets (Live)</div>
+    <div id="lastSync" style="font-size:10px;color:var(--text-muted);margin-top:4px">Syncing...</div>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="topbar-left">
+      <button class="hamburger" onclick="toggleMobileMenu()" aria-label="Menu">☰</button>
+      <div class="topbar-title">Siam Palette Group</div>
+    </div>
+    <div class="topbar-right">
+      <div class="date-badge" id="topDate">📅 Loading...</div>
+      <div class="live-badge"><span class="live-dot"></span> Live Data</div>
+      <div class="sync-info" id="topSync">⟳ Syncing...</div>
+    </div>
+  </div>
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleMobileMenu()"></div>
+
+  <!-- OVERVIEW -->
+  <div class="page active" id="page-overview">
+    <div class="section-title">📊 Dashboard Overview</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="overviewContent"><div class="loading"><div class="spinner"></div>Loading data from Google Sheets...</div></div>
+  </div>
+
+  <!-- P&L -->
+  <div class="page" id="page-pnl">
+    <div class="section-title">💰 Profit & Loss Statement</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="pnlContent"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+
+  <!-- BRANDS -->
+  <div class="page" id="page-brands">
+    <div class="section-title">🏪 Brand Performance</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="brandsContent"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+
+  <!-- MELTING CHEESE -->
+  <div class="page" id="page-melting">
+    <div class="section-title">🧀 The Melting Cheese — Deep Dive</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="meltingContent"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+
+  <!-- FOOT TRAFFIC -->
+  <div class="page" id="page-traffic">
+    <div class="section-title">🚶 Foot Traffic Analytics</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="trafficContent"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+
+  <!-- HEATMAP -->
+  <div class="page" id="page-heatmap">
+    <div class="section-title">🔥 Traffic Heatmap</div>
+    <div class="section-desc">จำนวน covers ตาม วัน × ช่วงเวลา — สีเข้ม = traffic สูง</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="heatmapContent"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+
+  <!-- MARKETING -->
+  <div class="page" id="page-marketing">
+    <div class="section-title">📱 Social Media & Campaigns</div>
+    <div class="data-source"><div class="gs-icon">G</div>Live from Google Sheets</div>
+    <div id="marketingContent"><div class="loading"><div class="spinner"></div>Loading...</div></div>
+  </div>
+</div>
+</div>
+
+<script>
+// ============================================================
+// CONFIG: Google Sheets CSV URLs
+// ============================================================
+const SHEETS = {
+  daily:    'https://docs.google.com/spreadsheets/d/e/2PACX-1vQu6FfGZ_voMGVTBe5U-HYpKtF2mXKQ3hiUBqGAi9boQRuI3vbDND8jnmv3jSsCyQ/pub?gid=981025724&single=true&output=csv',
+  monthly:  'https://docs.google.com/spreadsheets/d/e/2PACX-1vQu6FfGZ_voMGVTBe5U-HYpKtF2mXKQ3hiUBqGAi9boQRuI3vbDND8jnmv3jSsCyQ/pub?gid=1702600182&single=true&output=csv',
+  pnl:      'https://docs.google.com/spreadsheets/d/e/2PACX-1vQu6FfGZ_voMGVTBe5U-HYpKtF2mXKQ3hiUBqGAi9boQRuI3vbDND8jnmv3jSsCyQ/pub?gid=649699655&single=true&output=csv',
+  social:   'https://docs.google.com/spreadsheets/d/e/2PACX-1vQu6FfGZ_voMGVTBe5U-HYpKtF2mXKQ3hiUBqGAi9boQRuI3vbDND8jnmv3jSsCyQ/pub?gid=867020965&single=true&output=csv',
+  campaign: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQu6FfGZ_voMGVTBe5U-HYpKtF2mXKQ3hiUBqGAi9boQRuI3vbDND8jnmv3jSsCyQ/pub?gid=776319456&single=true&output=csv',
+};
+
+const BRAND_COLORS = {
+  'Mango Coco': '#f59e0b',
+  'Issho Cafe': '#22c55e',
+  'Golden Brown': '#d97706',
+  'Red Wok (Myer FC)': '#ef4444',
+  'Red Wok (Macquarie FC)': '#f97316',
+  'The Melting Cheese': '#eab308',
+};
+
+let DATA = {};
+let charts = {};
+
+// ============================================================
+// CSV PARSER
+// ============================================================
+function parseCSV(text) {
+  const rows = [];
+  let i = 0;
+  const len = text.length;
+  while (i < len) {
+    const row = [];
+    while (i < len) {
+      let cell = '';
+      // Skip leading whitespace
+      while (i < len && text[i] === ' ') i++;
+      if (i < len && text[i] === '"') {
+        // Quoted field
+        i++; // skip opening quote
+        while (i < len) {
+          if (text[i] === '"') {
+            if (i + 1 < len && text[i + 1] === '"') { cell += '"'; i += 2; }
+            else { i++; break; }
+          } else { cell += text[i]; i++; }
+        }
+        // Skip to comma or newline
+        while (i < len && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') i++;
+      } else {
+        // Unquoted field
+        while (i < len && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r') { cell += text[i]; i++; }
+      }
+      row.push(cell.trim());
+      if (i < len && text[i] === ',') { i++; continue; }
+      break;
+    }
+    // Skip line endings
+    if (i < len && text[i] === '\r') i++;
+    if (i < len && text[i] === '\n') i++;
+    if (row.length > 0 && !(row.length === 1 && row[0] === '')) rows.push(row);
+  }
+  return rows;
+}
+
+function findHeaderRow(rows, keyword) {
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
+    if (rows[i].some(c => c && c.toString().toLowerCase().includes(keyword.toLowerCase()))) return i;
+  }
+  return 0;
+}
+
+function toRecords(rows, headerIdx) {
+  const headers = rows[headerIdx];
+  const records = [];
+  for (let i = headerIdx + 1; i < rows.length; i++) {
+    if (!rows[i] || rows[i].every(c => !c)) continue;
+    const obj = {};
+    headers.forEach((h, j) => { if (h) obj[h.trim()] = rows[i][j] || ''; });
+    records.push(obj);
+  }
+  return records;
+}
+
+// ============================================================
+// FETCH ALL DATA
+// ============================================================
+async function fetchAll() {
+  try {
+    const [dailyText, monthlyText, pnlText, socialText, campaignText] = await Promise.all(
+      [SHEETS.daily, SHEETS.monthly, SHEETS.pnl, SHEETS.social, SHEETS.campaign].map(url =>
+        fetch(url).then(r => r.text())
+      )
+    );
+
+    // Parse Daily_Sales
+    let rows = parseCSV(dailyText);
+    let hi = findHeaderRow(rows, 'Date');
+    DATA.daily = toRecords(rows, hi);
+
+    // Parse Monthly_Summary
+    rows = parseCSV(monthlyText);
+    hi = findHeaderRow(rows, 'Month');
+    DATA.monthly = toRecords(rows, hi);
+
+    // Parse PnL (key-value style)
+    rows = parseCSV(pnlText);
+    DATA.pnlRaw = rows;
+
+    // Parse Social
+    rows = parseCSV(socialText);
+    hi = findHeaderRow(rows, 'Week Start');
+    DATA.social = toRecords(rows, hi);
+
+    // Parse Campaign
+    rows = parseCSV(campaignText);
+    hi = findHeaderRow(rows, 'Start Date');
+    DATA.campaign = toRecords(rows, hi);
+
+    // Update sync time
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit' });
+    document.getElementById('lastSync').textContent = `Last sync: ${timeStr}`;
+    document.getElementById('topSync').textContent = `✓ Synced ${timeStr}`;
+
+    // Find latest month
+    const months = [...new Set(DATA.monthly.map(r => r['Month']))].filter(Boolean).sort();
+    DATA.latestMonth = months[months.length - 1] || '2026-02';
+    DATA.prevMonth = months.length > 1 ? months[months.length - 2] : null;
+    DATA.allMonths = months;
+
+    const [y, m] = DATA.latestMonth.split('-');
+    const monthNames = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    document.getElementById('topDate').textContent = `📅 ${monthNames[parseInt(m)]} ${y}`;
+
+    console.log('✅ Data loaded:', {
+      daily: DATA.daily.length + ' rows',
+      monthly: DATA.monthly.length + ' rows',
+      social: DATA.social.length + ' rows',
+      campaign: DATA.campaign.length + ' rows',
+      latestMonth: DATA.latestMonth,
+      sampleMonthly: DATA.monthly[0]
+    });
+
+    renderAll();
+  } catch (err) {
+    console.error('❌ Fetch error:', err);
+    document.getElementById('overviewContent').innerHTML = `<div class="alert-banner alert-warning">⚠️ ไม่สามารถดึง data จาก Google Sheets ได้ — กรุณาเช็คว่า Publish to web เปิดอยู่<br><small>${err.message}</small></div>`;
+  }
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+function num(v) { return parseFloat(String(v).replace(/[$,%\s]/g, '')) || 0; }
+function numPct(v) { const s = String(v).trim(); const n = parseFloat(s.replace(/[%$,\s]/g, '')); return s.includes('%') ? n / 100 : (n > 1 ? n / 100 : n); }
+function fmt(n) { return '$' + Math.round(n).toLocaleString('en-US'); }
+function fmtN(n) { return Math.round(n).toLocaleString('en-US'); }
+function fmtPct(n) { return (n * 100).toFixed(1) + '%'; }
+function pctChange(curr, prev) { return prev ? ((curr - prev) / Math.abs(prev)) : 0; }
+function changeHtml(pct) {
+  const cls = pct >= 0 ? 'up' : 'down';
+  const arrow = pct >= 0 ? '↑' : '↓';
+  return `<span class="stat-change ${cls}">${arrow} ${Math.abs(pct * 100).toFixed(1)}%</span>`;
+}
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function getMonthlyBrand(month) {
+  return DATA.monthly.filter(r => r['Month'] === month);
+}
+
+function sumField(records, field) {
+  return records.reduce((s, r) => s + num(r[field]), 0);
+}
+
+// ============================================================
+// RENDER ALL PAGES
+// ============================================================
+function renderAll() {
+  renderOverview();
+  renderPnL();
+  renderBrands();
+  renderMelting();
+  renderTraffic();
+  renderHeatmap();
+  renderMarketing();
+}
+
+// ============================================================
+// OVERVIEW
+// ============================================================
+function renderOverview() {
+  const curr = getMonthlyBrand(DATA.latestMonth);
+  const prev = DATA.prevMonth ? getMonthlyBrand(DATA.prevMonth) : [];
+
+  const totalRev = sumField(curr, 'Total Revenue ($)');
+  const totalCost = sumField(curr, 'Total Costs ($)');
+  const totalProfit = sumField(curr, 'Net Profit ($)');
+  const totalTraffic = sumField(curr, 'Foot Traffic');
+
+  const prevRev = sumField(prev, 'Total Revenue ($)');
+  const prevCost = sumField(prev, 'Total Costs ($)');
+  const prevProfit = sumField(prev, 'Net Profit ($)');
+  const prevTraffic = sumField(prev, 'Foot Traffic');
+
+  const margin = totalRev > 0 ? totalProfit / totalRev : 0;
+
+  let html = `<div class="grid grid-4">
+    <div class="card"><div class="card-header"><div class="card-title">Total Revenue</div><div class="card-icon" style="background:var(--green-dim)">💵</div></div>
+      <div class="stat-value">${fmt(totalRev)}</div>${changeHtml(pctChange(totalRev, prevRev))}
+      <div class="stat-sub">vs last month: ${fmt(prevRev)}</div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Total Costs</div><div class="card-icon" style="background:var(--red-dim)">📉</div></div>
+      <div class="stat-value">${fmt(totalCost)}</div>${changeHtml(pctChange(totalCost, prevCost))}
+      <div class="stat-sub">COGS + Labour + Overhead</div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Net Profit</div><div class="card-icon" style="background:var(--gold-dim)">✨</div></div>
+      <div class="stat-value" style="color:${totalProfit >= 0 ? 'var(--green)' : 'var(--red)'}">${fmt(totalProfit)}</div>${changeHtml(pctChange(totalProfit, prevProfit))}
+      <div class="stat-sub">Margin: ${fmtPct(margin)}</div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Total Foot Traffic</div><div class="card-icon" style="background:var(--blue-dim)">🚶</div></div>
+      <div class="stat-value">${fmtN(totalTraffic)}</div>${changeHtml(pctChange(totalTraffic, prevTraffic))}
+      <div class="stat-sub">All locations combined</div></div>
+  </div>`;
+
+  // Revenue trend chart
+  html += `<div class="grid grid-2-1">
+    <div class="card"><div class="card-header"><div class="card-title">Revenue vs Costs Trend</div></div><div class="chart-container"><canvas id="revTrendChart"></canvas></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Revenue Split by Brand</div></div><div class="chart-container"><canvas id="brandPieChart"></canvas></div></div>
+  </div>`;
+
+  // TMC alert
+  const tmc = curr.find(r => r['Brand'] === 'The Melting Cheese');
+  if (tmc) {
+    const tmcMargin = numPct(tmc['Margin (%)']);
+    html += `<div class="alert-banner alert-warning">⚠️ <strong>The Melting Cheese:</strong>&nbsp; Margin ${fmtPct(tmcMargin)} — Revenue ${fmt(num(tmc['Total Revenue ($)']))} | Foot Traffic: ${fmtN(num(tmc['Foot Traffic']))}</div>`;
+  }
+
+  document.getElementById('overviewContent').innerHTML = html;
+
+  // Charts
+  const recentMonths = DATA.allMonths.slice(-6);
+  const revData = recentMonths.map(m => sumField(getMonthlyBrand(m), 'Total Revenue ($)'));
+  const costData = recentMonths.map(m => sumField(getMonthlyBrand(m), 'Total Costs ($)'));
+  const labels = recentMonths.map(m => { const [y, mo] = m.split('-'); return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)] + ' ' + y.slice(2); });
+
+  destroyChart('revTrendChart');
+  charts['revTrendChart'] = new Chart(document.getElementById('revTrendChart'), {
+    type: 'line', data: { labels, datasets: [
+      { label: 'Revenue', data: revData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,.08)', fill: true, tension: .4, pointRadius: 4, pointBackgroundColor: '#22c55e' },
+      { label: 'Costs', data: costData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,.05)', fill: true, tension: .4, pointRadius: 4, pointBackgroundColor: '#ef4444' }
+    ]}, options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'K' } } } }
+  });
+
+  // Pie chart
+  const brandNames = curr.map(r => r['Brand']);
+  const brandRevs = curr.map(r => num(r['Total Revenue ($)']));
+  const brandClrs = brandNames.map(n => BRAND_COLORS[n] || '#71717a');
+  destroyChart('brandPieChart');
+  charts['brandPieChart'] = new Chart(document.getElementById('brandPieChart'), {
+    type: 'doughnut', data: { labels: brandNames, datasets: [{ data: brandRevs, backgroundColor: brandClrs, borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '60%', plugins: { legend: { position: 'right', labels: { padding: 10, font: { size: 10 } } } } }
+  });
+}
+
+// ============================================================
+// P&L
+// ============================================================
+function renderPnL() {
+  const curr = getMonthlyBrand(DATA.latestMonth);
+  const totalRev = sumField(curr, 'Total Revenue ($)');
+  const totalCOGS = sumField(curr, 'Total COGS ($)');
+  const totalLabour = sumField(curr, 'Total Labour ($)');
+  const totalOther = sumField(curr, 'Total Other ($)');
+  const totalCost = totalCOGS + totalLabour + totalOther;
+  const profit = totalRev - totalCost;
+  const margin = totalRev > 0 ? profit / totalRev : 0;
+
+  let html = `<div class="section-desc">ข้อมูลเดือน ${DATA.latestMonth} — ดึงจาก Google Sheets อัตโนมัติ</div>`;
+  html += `<div class="grid grid-2"><div class="card"><h3 style="font-size:15px;font-weight:600;margin-bottom:16px">📊 SPG Group — ${DATA.latestMonth}</h3>`;
+
+  // Revenue by brand
+  curr.forEach(r => {
+    html += `<div class="pnl-row"><span class="pnl-label">${r['Brand']}</span><span class="pnl-value">${fmt(num(r['Total Revenue ($)']))}</span></div>`;
+  });
+  html += `<div class="pnl-row total"><span class="pnl-label">Total Revenue</span><span class="pnl-value" style="color:var(--green)">${fmt(totalRev)}</span></div><div style="height:20px"></div>`;
+
+  // Costs
+  html += `<div class="pnl-row"><span class="pnl-label">COGS (Food & Beverage)</span><span class="pnl-value" style="color:var(--red)">-${fmt(totalCOGS)}</span></div>`;
+  html += `<div class="pnl-row"><span class="pnl-label">Labour Cost</span><span class="pnl-value" style="color:var(--red)">-${fmt(totalLabour)}</span></div>`;
+  html += `<div class="pnl-row"><span class="pnl-label">Other Costs</span><span class="pnl-value" style="color:var(--red)">-${fmt(totalOther)}</span></div>`;
+  html += `<div class="pnl-row total"><span class="pnl-label">Total Expenses</span><span class="pnl-value" style="color:var(--red)">-${fmt(totalCost)}</span></div><div style="height:16px"></div>`;
+
+  // Profit
+  html += `<div class="pnl-row total" style="background:var(--gold-dim);padding:16px 20px;border-radius:var(--radius-sm);border:1px solid rgba(234,179,8,.2)">
+    <span class="pnl-label" style="color:var(--gold);font-size:16px">✨ Net Profit</span>
+    <span class="pnl-value" style="color:var(--gold);font-size:24px">${fmt(profit)}</span></div>
+    <div style="text-align:right;margin-top:8px;font-size:13px;color:var(--text-muted)">Margin: ${fmtPct(margin)}</div>`;
+  html += `</div>`;
+
+  // Charts
+  html += `<div><div class="card" style="margin-bottom:16px"><div class="card-header"><div class="card-title">Cost Breakdown</div></div><div class="chart-container-sm"><canvas id="costDonut"></canvas></div></div>`;
+  html += `<div class="card"><div class="card-header"><div class="card-title">Profit Margin by Brand</div></div><div class="chart-container-sm"><canvas id="marginBar"></canvas></div></div></div></div>`;
+
+  document.getElementById('pnlContent').innerHTML = html;
+
+  destroyChart('costDonut');
+  charts['costDonut'] = new Chart(document.getElementById('costDonut'), {
+    type: 'doughnut', data: { labels: ['COGS', 'Labour', 'Other'], datasets: [{ data: [totalCOGS, totalLabour, totalOther], backgroundColor: ['#ef4444', '#f97316', '#71717a'], borderWidth: 0 }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '55%', plugins: { legend: { position: 'bottom', labels: { padding: 8, font: { size: 10 } } } } }
+  });
+
+  const marginData = curr.map(r => numPct(r['Margin (%)']) * 100);
+  destroyChart('marginBar');
+  charts['marginBar'] = new Chart(document.getElementById('marginBar'), {
+    type: 'bar', data: { labels: curr.map(r => r['Brand'].replace('(', '\n(')), datasets: [{ label: 'Margin %', data: marginData, backgroundColor: curr.map(r => BRAND_COLORS[r['Brand']] || '#71717a'), borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { beginAtZero: true, max: 40, ticks: { callback: v => v + '%' } } } }
+  });
+}
+
+// ============================================================
+// BRANDS TABLE
+// ============================================================
+function renderBrands() {
+  const curr = getMonthlyBrand(DATA.latestMonth);
+  const prev = DATA.prevMonth ? getMonthlyBrand(DATA.prevMonth) : [];
+
+  let tableRows = '';
+  curr.forEach(r => {
+    const brand = r['Brand'];
+    const rev = num(r['Total Revenue ($)']);
+    const txn = num(r['Total Transactions']);
+    const avg = txn > 0 ? rev / txn : 0;
+    const traffic = num(r['Foot Traffic']);
+    const margin = numPct(r['Margin (%)']);
+    const marginPct = margin * 100;
+    const prevBrand = prev.find(p => p['Brand'] === brand);
+    const prevRev = prevBrand ? num(prevBrand['Total Revenue ($)']) : 0;
+    const chg = pctChange(rev, prevRev);
+    const color = BRAND_COLORS[brand] || '#71717a';
+    const isTMC = brand === 'The Melting Cheese';
+
+    tableRows += `<tr${isTMC ? ' style="background:rgba(234,179,8,.04)"' : ''}>
+      <td><div class="brand-cell"><div class="brand-dot" style="background:${color}"></div>${brand}${isTMC ? ' ⚠️' : ''}</div></td>
+      <td style="font-weight:600;color:var(--text)">${fmt(rev)}</td>
+      <td>${fmtN(txn)}</td><td>$${avg.toFixed(2)}</td><td>${fmtN(traffic)}</td>
+      <td class="${chg >= 0 ? 'val-positive' : 'val-negative'}">${chg >= 0 ? '+' : ''}${(chg * 100).toFixed(1)}%</td>
+      <td>${marginPct.toFixed(1)}%</td></tr>`;
+  });
+
+  let html = `<div class="card" style="margin-bottom:24px;overflow-x:auto"><table class="data-table"><thead><tr>
+    <th>Brand</th><th>Revenue</th><th>Transactions</th><th>Avg Spend</th><th>Foot Traffic</th><th>vs Last Month</th><th>Margin</th>
+  </tr></thead><tbody>${tableRows}</tbody></table></div>`;
+
+  // Brand trend chart
+  html += `<div class="card"><div class="card-header"><div class="card-title">Revenue by Brand — Trend</div></div><div class="chart-container"><canvas id="brandTrend"></canvas></div></div>`;
+
+  document.getElementById('brandsContent').innerHTML = html;
+
+  const recentMonths = DATA.allMonths.slice(-6);
+  const labels = recentMonths.map(m => { const [y, mo] = m.split('-'); return ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)]; });
+  const brands = [...new Set(curr.map(r => r['Brand']))];
+  const datasets = brands.map(brand => ({
+    label: brand, data: recentMonths.map(m => { const r = DATA.monthly.find(x => x['Month'] === m && x['Brand'] === brand); return r ? num(r['Total Revenue ($)']) : 0; }),
+    borderColor: BRAND_COLORS[brand] || '#71717a', tension: .4, pointRadius: 3,
+    borderDash: brand === 'The Melting Cheese' ? [5, 5] : []
+  }));
+
+  destroyChart('brandTrend');
+  charts['brandTrend'] = new Chart(document.getElementById('brandTrend'), {
+    type: 'line', data: { labels, datasets },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'K' } } } }
+  });
+}
+
+// ============================================================
+// MELTING CHEESE
+// ============================================================
+function renderMelting() {
+  const curr = DATA.monthly.find(r => r['Month'] === DATA.latestMonth && r['Brand'] === 'The Melting Cheese');
+  const prev = DATA.prevMonth ? DATA.monthly.find(r => r['Month'] === DATA.prevMonth && r['Brand'] === 'The Melting Cheese') : null;
+  if (!curr) { document.getElementById('meltingContent').innerHTML = '<div class="alert-banner alert-warning">No data for The Melting Cheese</div>'; return; }
+
+  const rev = num(curr['Total Revenue ($)']);
+  const txn = num(curr['Total Transactions']);
+  const traffic = num(curr['Foot Traffic']);
+  const avg = txn > 0 ? rev / txn : 0;
+  const prevRev = prev ? num(prev['Total Revenue ($)']) : 0;
+  const prevTxn = prev ? num(prev['Total Transactions']) : 0;
+  const prevTraffic = prev ? num(prev['Foot Traffic']) : 0;
+
+  let html = `<div class="grid grid-4">
+    <div class="card"><div class="card-title">Revenue</div><div class="stat-value" style="font-size:24px">${fmt(rev)}</div>${changeHtml(pctChange(rev, prevRev))}</div>
+    <div class="card"><div class="card-title">Transactions</div><div class="stat-value" style="font-size:24px">${fmtN(txn)}</div>${changeHtml(pctChange(txn, prevTxn))}</div>
+    <div class="card"><div class="card-title">Avg Spend</div><div class="stat-value" style="font-size:24px">$${avg.toFixed(2)}</div></div>
+    <div class="card"><div class="card-title">Foot Traffic</div><div class="stat-value" style="font-size:24px">${fmtN(traffic)}</div>${changeHtml(pctChange(traffic, prevTraffic))}</div>
+  </div>`;
+
+  // Daily chart for TMC
+  html += `<div class="grid grid-2">
+    <div class="card"><div class="card-header"><div class="card-title">TMC Daily Revenue — ${DATA.latestMonth}</div></div><div class="chart-container"><canvas id="tmcDailyChart"></canvas></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">TMC Monthly Revenue Trend</div></div><div class="chart-container"><canvas id="tmcTrendChart"></canvas></div></div>
+  </div>`;
+
+  document.getElementById('meltingContent').innerHTML = html;
+
+  // TMC daily chart
+  const tmcDaily = DATA.daily.filter(r => r['Brand'] === 'The Melting Cheese' && r['Date'] && r['Date'].startsWith(DATA.latestMonth));
+  const dailyLabels = tmcDaily.map(r => r['Date'].split('-')[2]);
+  const dailyRevs = tmcDaily.map(r => num(r['Revenue ($)']));
+
+  destroyChart('tmcDailyChart');
+  charts['tmcDailyChart'] = new Chart(document.getElementById('tmcDailyChart'), {
+    type: 'bar', data: { labels: dailyLabels, datasets: [{ label: 'Revenue', data: dailyRevs, backgroundColor: dailyRevs.map(v => v > 3000 ? 'rgba(234,179,8,.6)' : 'rgba(234,179,8,.25)'), borderRadius: 3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => '$' + v } }, x: { ticks: { font: { size: 9 } } } } }
+  });
+
+  // TMC monthly trend
+  const recentMonths = DATA.allMonths.slice(-6);
+  const tmcMonthly = recentMonths.map(m => { const r = DATA.monthly.find(x => x['Month'] === m && x['Brand'] === 'The Melting Cheese'); return r ? num(r['Total Revenue ($)']) : 0; });
+  const trendLabels = recentMonths.map(m => ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.split('-')[1])]);
+
+  destroyChart('tmcTrendChart');
+  charts['tmcTrendChart'] = new Chart(document.getElementById('tmcTrendChart'), {
+    type: 'line', data: { labels: trendLabels, datasets: [{ label: 'TMC Revenue', data: tmcMonthly, borderColor: '#eab308', backgroundColor: 'rgba(234,179,8,.1)', fill: true, tension: .4, pointRadius: 5, pointBackgroundColor: '#eab308' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { ticks: { callback: v => '$' + (v/1000).toFixed(0) + 'K' } } } }
+  });
+}
+
+// ============================================================
+// TRAFFIC
+// ============================================================
+function renderTraffic() {
+  const recentMonths = DATA.allMonths.slice(-6);
+  const labels = recentMonths.map(m => ['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(m.split('-')[1])]);
+  const trafficData = recentMonths.map(m => sumField(getMonthlyBrand(m), 'Foot Traffic'));
+
+  let html = `<div class="grid grid-2">
+    <div class="card"><div class="card-header"><div class="card-title">Monthly Foot Traffic — All Brands</div></div><div class="chart-container"><canvas id="monthlyTrafficChart"></canvas></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Traffic by Brand — ${DATA.latestMonth}</div></div><div class="chart-container"><canvas id="trafficByBrand"></canvas></div></div>
+  </div>`;
+
+  // Day of week pattern from Daily_Sales
+  html += `<div class="card"><div class="card-header"><div class="card-title">Traffic by Day of Week (All Time Average)</div></div><div class="chart-container"><canvas id="dowChart"></canvas></div></div>`;
+
+  document.getElementById('trafficContent').innerHTML = html;
+
+  destroyChart('monthlyTrafficChart');
+  charts['monthlyTrafficChart'] = new Chart(document.getElementById('monthlyTrafficChart'), {
+    type: 'line', data: { labels, datasets: [{ label: 'Foot Traffic', data: trafficData, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,.1)', fill: true, tension: .4, pointRadius: 4 }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  // Traffic by brand
+  const curr = getMonthlyBrand(DATA.latestMonth);
+  destroyChart('trafficByBrand');
+  charts['trafficByBrand'] = new Chart(document.getElementById('trafficByBrand'), {
+    type: 'bar', data: { labels: curr.map(r => r['Brand'].replace('(', '\n(')), datasets: [{ label: 'Foot Traffic', data: curr.map(r => num(r['Foot Traffic'])), backgroundColor: curr.map(r => BRAND_COLORS[r['Brand']] || '#71717a'), borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+
+  // Day of week
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+  const dayCounts = [0, 0, 0, 0, 0, 0, 0];
+  DATA.daily.forEach(r => {
+    if (!r['Date']) return;
+    const d = new Date(r['Date']);
+    const dow = d.getDay();
+    dayTotals[dow] += num(r['Foot Traffic (Covers)']);
+    dayCounts[dow]++;
+  });
+  const dayAvgs = dayTotals.map((t, i) => dayCounts[i] > 0 ? Math.round(t / dayCounts[i]) : 0);
+  // Reorder Mon-Sun
+  const orderedAvgs = [...dayAvgs.slice(1), dayAvgs[0]];
+  const orderedNames = [...dayNames.slice(1), dayNames[0]];
+
+  destroyChart('dowChart');
+  charts['dowChart'] = new Chart(document.getElementById('dowChart'), {
+    type: 'bar', data: { labels: orderedNames, datasets: [{ label: 'Avg Covers', data: orderedAvgs, backgroundColor: orderedAvgs.map((v, i) => i >= 4 ? '#22c55e' : '#3b82f6'), borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+  });
+}
+
+// ============================================================
+// HEATMAP
+// ============================================================
+function renderHeatmap() {
+  // Build heatmap from daily data
+  // We don't have hourly data, so we'll show Day × Brand heatmap instead
+  const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const brands = Object.keys(BRAND_COLORS);
+
+  // All brands heatmap: Day of Week × Brand → avg revenue
+  const matrix = {};
+  brands.forEach(b => { matrix[b] = [0,0,0,0,0,0,0]; });
+  const counts = {};
+  brands.forEach(b => { counts[b] = [0,0,0,0,0,0,0]; });
+
+  DATA.daily.forEach(r => {
+    if (!r['Date'] || !r['Brand']) return;
+    const d = new Date(r['Date']);
+    let dow = d.getDay() - 1; if (dow < 0) dow = 6; // Mon=0, Sun=6
+    // Map daily brand+location to our brand names
+    let brandKey = r['Brand'];
+    if (r['Brand'] === 'Red Wok') {
+      brandKey = r['Location'] === 'Macquarie FC' ? 'Red Wok (Macquarie FC)' : 'Red Wok (Myer FC)';
+    }
+    if (matrix[brandKey]) {
+      matrix[brandKey][dow] += num(r['Foot Traffic (Covers)']);
+      counts[brandKey][dow]++;
+    }
+  });
+
+  // Calculate averages
+  brands.forEach(b => {
+    for (let d = 0; d < 7; d++) {
+      matrix[b][d] = counts[b][d] > 0 ? Math.round(matrix[b][d] / counts[b][d]) : 0;
+    }
+  });
+
+  const allVals = brands.flatMap(b => matrix[b]);
+  const maxVal = Math.max(...allVals, 1);
+
+  function buildGrid(title, brandsToShow) {
+    let h = `<div class="card" style="margin-bottom:24px"><div class="card-header"><div class="card-title">${title}</div></div>`;
+    h += `<div class="heatmap" style="grid-template-columns:140px repeat(7,1fr)"><div></div>`;
+    dayNames.forEach(d => { h += `<div class="heatmap-header">${d}</div>`; });
+    brandsToShow.forEach(brand => {
+      h += `<div class="heatmap-label" style="font-size:10px">${brand.replace('(', '<br>(')}</div>`;
+      matrix[brand].forEach(val => {
+        const intensity = val / maxVal;
+        const bg = `rgba(234,${Math.round(179 * intensity * .6) + 80},${Math.round(8 * intensity) + 20},${.15 + intensity * .7})`;
+        h += `<div class="heatmap-cell" style="background:${bg}" title="${brand}: ${val} covers">${val}</div>`;
+      });
+    });
+    h += '</div></div>';
+    return h;
+  }
+
+  let html = buildGrid('All Brands — Avg Daily Covers by Day of Week', brands);
+  html += buildGrid('🧀 The Melting Cheese Only', ['The Melting Cheese']);
+
+  document.getElementById('heatmapContent').innerHTML = html;
+}
+
+// ============================================================
+// MARKETING
+// ============================================================
+function renderMarketing() {
+  // Get latest social data
+  const weeks = [...new Set(DATA.social.map(r => r['Week Start']))].filter(Boolean).sort();
+  const latestWeek = weeks[weeks.length - 1] || '';
+  const latestSocial = DATA.social.filter(r => r['Week Start'] === latestWeek);
+
+  // Total followers (latest week, sum unique brand+platform)
+  const totalFollowers = latestSocial.reduce((s, r) => s + num(r['Followers']), 0);
+  const totalReach = latestSocial.reduce((s, r) => s + num(r['Reach']), 0);
+  const totalClicks = latestSocial.reduce((s, r) => s + num(r['Website Clicks']), 0);
+  const totalPromos = latestSocial.reduce((s, r) => s + num(r['Promo Code Redemptions']), 0);
+
+  let html = `<div class="grid grid-4">
+    <div class="card"><div class="card-title">Total Followers</div><div class="stat-value" style="font-size:22px">${fmtN(totalFollowers)}</div><div class="stat-sub">All brands, all platforms</div></div>
+    <div class="card"><div class="card-title">Weekly Reach</div><div class="stat-value" style="font-size:22px">${fmtN(totalReach)}</div><div class="stat-sub">Week of ${latestWeek}</div></div>
+    <div class="card"><div class="card-title">Website Clicks</div><div class="stat-value" style="font-size:22px">${fmtN(totalClicks)}</div></div>
+    <div class="card"><div class="card-title">Promo Redemptions</div><div class="stat-value" style="font-size:22px">${fmtN(totalPromos)}</div></div>
+  </div>`;
+
+  // Follower growth chart
+  html += `<div class="grid grid-2">
+    <div class="card"><div class="card-header"><div class="card-title">Instagram Follower Growth</div></div><div class="chart-container"><canvas id="igGrowth"></canvas></div></div>
+    <div class="card"><div class="card-header"><div class="card-title">Campaign Performance</div></div>`;
+
+  // Campaign table
+  const recentCampaigns = DATA.campaign.slice(-8);
+  html += `<div style="overflow-x:auto"><table class="data-table"><thead><tr><th>Campaign</th><th>Brand</th><th>Channel</th><th>Budget</th><th>Revenue</th><th>ROI</th></tr></thead><tbody>`;
+  recentCampaigns.forEach(c => {
+    const budget = num(c['Budget ($)']);
+    const revenue = num(c['Est. Revenue ($)']);
+    const roi = budget > 0 ? (revenue / budget) : 0;
+    html += `<tr><td style="color:var(--text)">${c['Campaign Name'] || ''}</td><td>${c['Brand'] || ''}</td><td>${c['Channel'] || ''}</td>
+      <td>${fmt(budget)}</td><td>${fmt(revenue)}</td><td class="${roi > 1 ? 'val-positive' : 'val-negative'}">${roi.toFixed(1)}x</td></tr>`;
+  });
+  html += `</tbody></table></div></div></div>`;
+
+  document.getElementById('marketingContent').innerHTML = html;
+
+  // IG follower growth by brand
+  const igData = DATA.social.filter(r => r['Platform'] === 'Instagram');
+  const igWeeks = [...new Set(igData.map(r => r['Week Start']))].filter(Boolean).sort();
+  const igBrands = [...new Set(igData.map(r => r['Brand']))];
+  const recentIGWeeks = igWeeks.slice(-12);
+  const igLabels = recentIGWeeks.map(w => { const parts = w.split('-'); return parts[1] + '/' + parts[2]; });
+
+  const igDatasets = igBrands.map(brand => ({
+    label: brand,
+    data: recentIGWeeks.map(w => { const r = igData.find(x => x['Week Start'] === w && x['Brand'] === brand); return r ? num(r['Followers']) : 0; }),
+    borderColor: BRAND_COLORS[brand] || '#71717a', tension: .4, pointRadius: 2
+  }));
+
+  destroyChart('igGrowth');
+  charts['igGrowth'] = new Chart(document.getElementById('igGrowth'), {
+    type: 'line', data: { labels: igLabels, datasets: igDatasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { font: { size: 10 } } } }, scales: { x: { ticks: { font: { size: 9 }, maxRotation: 45 } } } }
+  });
+}
+
+// ============================================================
+// NAVIGATION
+// ============================================================
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.sidebar-item').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  if (btn) btn.classList.add('active');
+  closeMobileMenu();
+  window.scrollTo(0, 0);
+}
+
+function toggleMobileMenu() {
+  document.querySelector('.sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('show');
+  document.body.style.overflow = document.querySelector('.sidebar').classList.contains('open') ? 'hidden' : '';
+}
+
+function closeMobileMenu() {
+  document.querySelector('.sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
+// ============================================================
+// CHART.JS DEFAULTS
+// ============================================================
+Chart.defaults.color = '#71717a';
+Chart.defaults.borderColor = '#27272a';
+Chart.defaults.font.family = 'DM Sans';
+Chart.defaults.font.size = 11;
+Chart.defaults.plugins.legend.labels.boxWidth = 12;
+Chart.defaults.plugins.legend.labels.padding = 16;
+
+// ============================================================
+// INIT — Fetch data on load
+// ============================================================
+fetchAll();
+
+// Auto-refresh every 5 minutes
+setInterval(fetchAll, 5 * 60 * 1000);
+</script>
+</body>
+</html>
